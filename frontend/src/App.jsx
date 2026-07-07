@@ -5,7 +5,9 @@ import Login from './pages/Login';
 import Feed from './pages/Feed';
 import Profile from './pages/Profile';
 import Discover from './pages/Discover';
+import Notifications from './pages/Notifications'; 
 import Sidebar from './components/Sidebar';
+// adjust path to match your folder
 import { Loader2 } from 'lucide-react';
 
 export default function App() {
@@ -45,6 +47,7 @@ export default function App() {
               <Route path="/" element={<Feed />} />
               <Route path="/profile/:username" element={<Profile />} />
               <Route path="/discover" element={<Discover />} />
+              <Route path="/notifications" element={<Notifications />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>

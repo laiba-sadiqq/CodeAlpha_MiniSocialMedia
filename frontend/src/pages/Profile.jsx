@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import PostCard from '../components/PostCard';
 import { useAuth } from '../context/AuthContext';
-import { Edit3, UserPlus, UserMinus, Calendar, Grid, X, Upload, Check } from 'lucide-react';
+import { Edit3, UserPlus, UserMinus, Clock, Calendar, Grid, X, Upload, Check } from 'lucide-react';
 
 // Preset avatars using dicebear with various nice seeds
 const PRESET_AVATARS = [
@@ -17,6 +17,15 @@ const PRESET_AVATARS = [
   { label: 'Maker', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=preset8' },
 ];
 
+// Quick-pick status/mood presets
+const STATUS_PRESETS = [
+  '🌙 Feeling sleepy',
+  '🎮 Gaming',
+  '🎵 Listening to music',
+  '📚 Studying',
+  '💻 Coding',
+];
+
 export default function Profile() {
   const { username } = useParams();
   const { user: currentUser, updateUser } = useAuth();
@@ -25,12 +34,14 @@ export default function Profile() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
 
   // Edit Modal
   const [showEditModal, setShowEditModal] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState('');
   const [editBio, setEditBio] = useState('');
+  const [editStatus, setEditStatus] = useState('');
   const [editAvatarUrl, setEditAvatarUrl] = useState('');
   const [avatarTab, setAvatarTab] = useState('preset'); // 'preset' | 'upload' | 'url'
   const [modalError, setModalError] = useState('');
@@ -49,6 +60,7 @@ export default function Profile() {
       if (currentUser && res.data.user.followers) {
         setIsFollowing(res.data.user.followers.includes(currentUser._id));
       }
+      setHasPendingRequest(!!res.data.hasPendingRequest);
     } catch (err) {
       console.error('Error fetching profile:', err);
     } finally {
@@ -62,7 +74,10 @@ export default function Profile() {
     if (isOwnProfile) return;
     try {
       const res = await axios.post(`/api/users/follow/${profileUser._id}`);
-      setIsFollowing(res.data.isFollowing);
+      // status is one of: 'not_following' (unfollowed or request withdrawn)
+      // or 'requested' (a new follow request was just sent, pending approval)
+      setIsFollowing(res.data.status === 'following');
+      setHasPendingRequest(res.data.status === 'requested');
       setFollowersCount(res.data.followersCount);
       updateUser({ ...currentUser, following: res.data.currentUserFollowing });
     } catch (err) {
@@ -73,6 +88,7 @@ export default function Profile() {
   const openEditModal = () => {
     setEditDisplayName(profileUser.displayName || '');
     setEditBio(profileUser.bio || '');
+    setEditStatus(profileUser.status || '');
     setEditAvatarUrl(profileUser.avatarUrl || '');
     setAvatarTab('preset');
     setModalError('');
@@ -96,10 +112,11 @@ export default function Profile() {
       const res = await axios.put('/api/users/profile', {
         displayName: editDisplayName,
         bio: editBio,
+        status: editStatus,
         avatarUrl: editAvatarUrl
       });
       updateUser(res.data);
-      setProfileUser((prev) => ({ ...prev, displayName: res.data.displayName, bio: res.data.bio, avatarUrl: res.data.avatarUrl }));
+      setProfileUser((prev) => ({ ...prev, displayName: res.data.displayName, bio: res.data.bio, status: res.data.status, avatarUrl: res.data.avatarUrl }));
       setShowEditModal(false);
     } catch (err) {
       setModalError(err.response?.data?.error || 'Failed to update profile.');
@@ -151,6 +168,11 @@ export default function Profile() {
           <div className="pb-1">
             <h1 className="text-[19px] font-extrabold text-slate-900 leading-tight">{profileUser.displayName}</h1>
             <p className="text-[12px] text-slate-400 font-semibold mt-0.5">@{profileUser.username}</p>
+            {profileUser.status && (
+              <span className="inline-flex items-center mt-1.5 text-[12px] font-semibold text-primary-wine bg-primary-wine/10 border border-primary-wine/20 rounded-full px-2.5 py-1">
+                {profileUser.status}
+              </span>
+            )}
           </div>
         </div>
 
@@ -163,35 +185,56 @@ export default function Profile() {
               <Edit3 className="w-4 h-4" />
               Edit Profile
             </button>
+          ) : isFollowing ? (
+            <button
+              onClick={handleFollowToggle}
+              className="font-bold text-[13px] py-2 px-4 rounded-xl flex items-center gap-1.5 cursor-pointer transition-all shadow-sm bg-slate-100 border-2 border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+            >
+              <UserMinus className="w-4 h-4" />Unfollow
+            </button>
+          ) : hasPendingRequest ? (
+            <button
+              onClick={handleFollowToggle}
+              title="Click to cancel your request"
+              className="font-bold text-[13px] py-2 px-4 rounded-xl flex items-center gap-1.5 cursor-pointer transition-all shadow-sm bg-slate-100 border-2 border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+            >
+              <Clock className="w-4 h-4" />Requested
+            </button>
           ) : (
             <button
               onClick={handleFollowToggle}
-              className={`font-bold text-[13px] py-2 px-4 rounded-xl flex items-center gap-1.5 cursor-pointer transition-all shadow-sm ${
-                isFollowing
-                  ? 'bg-slate-100 border-2 border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200'
-                  : 'btn-primary py-2 px-4 border-2 border-primary-dark shadow-sm'
-              }`}
+              className="btn-primary py-2 px-4 border-2 border-primary-dark shadow-sm font-bold text-[13px] rounded-xl flex items-center gap-1.5 cursor-pointer transition-all"
             >
-              {isFollowing ? <><UserMinus className="w-4 h-4" />Unfollow</> : <><UserPlus className="w-4 h-4" />Follow</>}
+              <UserPlus className="w-4 h-4" />Follow
             </button>
           )}
         </div>
       </div>
 
       {/* Bio & Stats */}
-      <div className="py-5 px-2 space-y-3">
+      <div className="py-5 px-2 space-y-4">
         {profileUser.bio
           ? <p className="text-[14px] text-slate-600 leading-relaxed">{profileUser.bio}</p>
           : <p className="text-[13px] text-slate-400 italic">No bio written yet.</p>
         }
-        <div className="flex flex-wrap items-center gap-5 text-[12px] text-slate-500 font-semibold">
-          <div className="flex items-center gap-1.5">
-            <Calendar className="w-4 h-4 text-slate-400" />
-            Joined {new Date(profileUser.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+
+        <div className="flex items-center gap-1.5 text-[12px] text-slate-500 font-semibold">
+          <Calendar className="w-4 h-4 text-slate-400" />
+          Joined {new Date(profileUser.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        </div>
+
+        <div className="grid grid-cols-3 gap-2.5">
+          <div className="text-center py-3 rounded-xl bg-primary-light/60 border border-primary-olive/20">
+            <p className="text-[18px] font-extrabold text-slate-900 leading-none">{posts.length}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">Posts</p>
           </div>
-          <div className="flex gap-4">
-            <span><strong className="text-slate-800 font-extrabold">{followersCount}</strong> <span className="text-slate-400">followers</span></span>
-            <span><strong className="text-slate-800 font-extrabold">{profileUser.following?.length || 0}</strong> <span className="text-slate-400">following</span></span>
+          <div className="text-center py-3 rounded-xl bg-primary-light/60 border border-primary-olive/20">
+            <p className="text-[18px] font-extrabold text-slate-900 leading-none">{followersCount}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">Followers</p>
+          </div>
+          <div className="text-center py-3 rounded-xl bg-primary-light/60 border border-primary-olive/20">
+            <p className="text-[18px] font-extrabold text-slate-900 leading-none">{profileUser.following?.length || 0}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">Following</p>
           </div>
         </div>
       </div>
@@ -203,8 +246,19 @@ export default function Profile() {
           <h2 className="font-bold text-[12px] uppercase tracking-wider text-slate-500">Posts ({posts.length})</h2>
         </div>
         {posts.length === 0 ? (
-          <div className="text-center py-12 border border-dashed border-slate-300 rounded-2xl bg-white">
-            <p className="text-[13px] text-slate-400">No posts yet.</p>
+          <div className="text-center py-14 border border-dashed border-slate-300 rounded-2xl bg-white">
+            <p className="text-[38px] leading-none mb-3">📸</p>
+            <p className="text-[14px] font-bold text-slate-600">Nothing here yet.</p>
+            {isOwnProfile ? (
+              <Link
+                to="/"
+                className="inline-flex items-center gap-1.5 mt-4 btn-primary py-2 px-4 text-[13px]"
+              >
+                Create your first post!
+              </Link>
+            ) : (
+              <p className="text-[12px] text-slate-400 mt-1.5">This user hasn't posted anything yet.</p>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
@@ -342,6 +396,44 @@ export default function Profile() {
                   placeholder="Jane Doe"
                   className="w-full input-field py-2.5 px-4 text-[14px]"
                 />
+              </div>
+
+              {/* Status / Mood */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Status / Mood</label>
+                <input
+                  type="text"
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value.slice(0, 60))}
+                  placeholder="e.g. 🎮 Gaming"
+                  maxLength={60}
+                  className="w-full input-field py-2.5 px-4 text-[14px]"
+                />
+                <div className="flex flex-wrap gap-1.5 mt-2.5">
+                  {STATUS_PRESETS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setEditStatus(preset)}
+                      className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border cursor-pointer transition-all ${
+                        editStatus === preset
+                          ? 'bg-primary-wine text-white border-primary-wine'
+                          : 'bg-white text-primary-dark border-primary-olive/40 hover:border-primary-wine hover:text-primary-wine'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                  {editStatus && (
+                    <button
+                      type="button"
+                      onClick={() => setEditStatus('')}
+                      className="text-[11px] font-bold px-2.5 py-1 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer transition-all"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Bio */}

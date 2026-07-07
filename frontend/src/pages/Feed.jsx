@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import PostCard from '../components/PostCard';
 import { useAuth } from '../context/AuthContext';
-import { Send, UserPlus, X, UploadCloud, Image, Sparkles } from 'lucide-react';
+import { Send, UserPlus, Clock, X, UploadCloud, Image, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Feed() {
@@ -83,11 +83,16 @@ export default function Feed() {
     }
   };
 
-  const handleFollowUser = async (targetId) => {
+  const handleFollowToggle = async (targetId) => {
     try {
-      await axios.post(`/api/users/follow/${targetId}`);
-      setSuggestions((prev) => prev.filter((u) => u._id !== targetId));
-      fetchFeed();
+      const res = await axios.post(`/api/users/follow/${targetId}`);
+      // Suggestion stays put with an updated state until the request is
+      // accepted (at which point /api/users/discover stops returning them).
+      setSuggestions((prev) =>
+        prev.map((u) =>
+          u._id === targetId ? { ...u, hasPendingRequest: res.data.status === 'requested' } : u
+        )
+      );
     } catch (err) {
       console.error('Error following user:', err);
     }
@@ -252,13 +257,24 @@ export default function Feed() {
                         <p className="text-[10px] text-slate-400 truncate">@{sug.username}</p>
                       </div>
                     </Link>
-                    <button
-                      onClick={() => handleFollowUser(sug._id)}
-                      className="flex items-center gap-1 text-[11px] font-bold text-primary-wine bg-primary-wine/5 hover:bg-primary-wine/10 border border-primary-wine/20 px-3 py-1.5 rounded-lg transition-all cursor-pointer shrink-0"
-                    >
-                      <UserPlus className="w-3 h-3" />
-                      Follow
-                    </button>
+                    {sug.hasPendingRequest ? (
+                      <button
+                        onClick={() => handleFollowToggle(sug._id)}
+                        title="Click to cancel your request"
+                        className="flex items-center gap-1 text-[11px] font-bold text-slate-500 bg-slate-100 hover:bg-red-50 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3 py-1.5 rounded-lg transition-all cursor-pointer shrink-0"
+                      >
+                        <Clock className="w-3 h-3" />
+                        Requested
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleFollowToggle(sug._id)}
+                        className="flex items-center gap-1 text-[11px] font-bold text-primary-wine bg-primary-wine/5 hover:bg-primary-wine/10 border border-primary-wine/20 px-3 py-1.5 rounded-lg transition-all cursor-pointer shrink-0"
+                      >
+                        <UserPlus className="w-3 h-3" />
+                        Follow
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

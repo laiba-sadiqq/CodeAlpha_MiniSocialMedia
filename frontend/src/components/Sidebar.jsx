@@ -1,20 +1,40 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { Home, Compass, User, LogOut, MessageSquareCode, PenSquare } from 'lucide-react';
+import { Home, Compass, User, LogOut, MessageSquareCode, PenSquare, Bell } from 'lucide-react';
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
+  const fetchUnreadCount = async () => {
+    try {
+      const res = await axios.get('/api/notifications/unread-count');
+      setUnreadCount(res.data.count || 0);
+    } catch (err) {
+      console.error('Error fetching unread count:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    fetchUnreadCount();
+    // Poll periodically so the badge updates even if the tab is left open
+    const interval = setInterval(fetchUnreadCount, 20000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   const navItems = [
     { name: 'Home', path: '/', icon: Home },
     { name: 'Discover', path: '/discover', icon: Compass },
+    { name: 'Notifications', path: '/notifications', icon: Bell, badge: unreadCount },
     { name: 'Profile', path: `/profile/${user?.username}`, icon: User },
   ];
 
@@ -39,8 +59,11 @@ export default function Sidebar() {
               <NavLink
                 key={item.path}
                 to={item.path}
+                onClick={() => {
+                  if (item.path === '/notifications') setUnreadCount(0);
+                }}
                 className={({ isActive }) =>
-                  `flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-[14px] font-semibold transition-all cursor-pointer ${
+                  `relative flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-[14px] font-semibold transition-all cursor-pointer ${
                     isActive
                       ? 'bg-primary-wine text-white shadow-md'
                       : 'text-primary-olive hover:text-primary-wine hover:bg-primary-light/60'
@@ -49,7 +72,14 @@ export default function Sidebar() {
               >
                 {({ isActive }) => (
                   <>
-                    <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-white' : 'text-primary-olive'}`} />
+                    <span className="relative shrink-0">
+                      <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-primary-olive'}`} />
+                      {!!item.badge && (
+                        <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white">
+                          {item.badge > 9 ? '9+' : item.badge}
+                        </span>
+                      )}
+                    </span>
                     <span className="hidden md:block">{item.name}</span>
                   </>
                 )}

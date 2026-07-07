@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { Search, UserPlus, Compass, Users } from 'lucide-react';
+import { Search, UserPlus, Clock, Compass, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Discover() {
@@ -24,11 +24,18 @@ export default function Discover() {
 
   useEffect(() => { fetchUsers(); }, []);
 
-  const handleFollow = async (targetId) => {
+  const handleFollowToggle = async (targetId) => {
     try {
       const res = await axios.post(`/api/users/follow/${targetId}`);
       updateUser({ ...currentUser, following: res.data.currentUserFollowing });
-      setUsers((prev) => prev.filter((u) => u._id !== targetId));
+      // Keep the person in the list, just flip their request state, since
+      // they only leave "Discover" once the request is accepted (and they
+      // no longer show up server-side as a non-followed user).
+      setUsers((prev) =>
+        prev.map((u) =>
+          u._id === targetId ? { ...u, hasPendingRequest: res.data.status === 'requested' } : u
+        )
+      );
     } catch (err) {
       console.error('Error following user:', err);
     }
@@ -108,13 +115,24 @@ export default function Discover() {
                 </div>
               </div>
 
-              <button
-                onClick={() => handleFollow(item._id)}
-                className="flex items-center gap-1 text-[12px] font-bold text-primary-wine bg-primary-wine/5 hover:bg-primary-wine/10 border border-primary-wine/20 px-3 py-2 rounded-xl transition-all cursor-pointer shrink-0"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                Follow
-              </button>
+              {item.hasPendingRequest ? (
+                <button
+                  onClick={() => handleFollowToggle(item._id)}
+                  title="Click to cancel your request"
+                  className="flex items-center gap-1 text-[12px] font-bold text-slate-500 bg-slate-100 hover:bg-red-50 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3 py-2 rounded-xl transition-all cursor-pointer shrink-0"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  Requested
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleFollowToggle(item._id)}
+                  className="flex items-center gap-1 text-[12px] font-bold text-primary-wine bg-primary-wine/5 hover:bg-primary-wine/10 border border-primary-wine/20 px-3 py-2 rounded-xl transition-all cursor-pointer shrink-0"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  Follow
+                </button>
+              )}
             </div>
           ))}
         </div>
