@@ -1,6 +1,11 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 
+// Point axios at the deployed backend in production, fall back to local dev server.
+// VITE_API_URL must be set in Vercel's Environment Variables (build-time), e.g.
+// VITE_API_URL=https://codealphaminisocialmedia-production.up.railway.app
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
