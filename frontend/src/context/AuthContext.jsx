@@ -1,9 +1,9 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 
-// Point axios at the deployed backend in production, fall back to local dev server.
-// VITE_API_URL must be set in Vercel's Environment Variables (build-time), e.g.
-// VITE_API_URL=https://codealphaminisocialmedia-production.up.railway.app
+// Local dev hits your backend directly on :5000.
+// In production, set VITE_API_URL in your host's environment variables
+// (e.g. Vercel/Netlify/Render dashboard) to your deployed backend's URL.
 axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const AuthContext = createContext(null);
@@ -47,13 +47,27 @@ export const AuthProvider = ({ children }) => {
   }, [token]);
 
   // Register action
-  const register = async (username, password, displayName) => {
+  const register = async (username, email, password, displayName) => {
     try {
-      const res = await axios.post('/api/auth/register', { username, password, displayName });
-      setToken(res.data.token);
-      setUser(res.data.user);
-      return { success: true };
+      const res = await axios.post('/api/auth/register', { 
+        username, 
+        email, 
+        password, 
+        displayName 
+      });
+      
+      if (res.data.token && res.data.user) {
+        setToken(res.data.token);
+        setUser(res.data.user);
+        return { success: true };
+      } else {
+        return {
+          success: false,
+          error: 'Registration failed: Invalid response from server'
+        };
+      }
     } catch (err) {
+      console.error('Registration error:', err);
       return {
         success: false,
         error: err.response?.data?.error || 'Registration failed. Please try again.'
@@ -61,14 +75,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Login action
-  const login = async (username, password) => {
+  // Login action — identifier can be a username or an email
+  const login = async (identifier, password) => {
     try {
-      const res = await axios.post('/api/auth/login', { username, password });
-      setToken(res.data.token);
-      setUser(res.data.user);
-      return { success: true };
+      const res = await axios.post('/api/auth/login', { 
+        identifier, 
+        password 
+      });
+      
+      if (res.data.token && res.data.user) {
+        setToken(res.data.token);
+        setUser(res.data.user);
+        return { success: true };
+      } else {
+        return {
+          success: false,
+          error: 'Login failed: Invalid response from server'
+        };
+      }
     } catch (err) {
+      console.error('Login error:', err);
       return {
         success: false,
         error: err.response?.data?.error || 'Invalid username or password.'

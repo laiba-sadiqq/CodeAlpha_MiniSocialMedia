@@ -31,6 +31,7 @@ const seedData = async () => {
     const usersData = [
       {
         username: 'sarah_codes',
+        email: 'sarah@example.com',
         passwordHash: commonPasswordHash,
         displayName: 'Sarah Jenkins',
         bio: 'Senior Frontend Developer. Building accessible & beautiful user interfaces with React, Tailwind & Vite. ☕ Coffee powered.',
@@ -38,6 +39,7 @@ const seedData = async () => {
       },
       {
         username: 'alex_design',
+        email: 'alex@example.com',
         passwordHash: commonPasswordHash,
         displayName: 'Alex Mercer',
         bio: 'Product Designer & Visual Artist. Finding beauty in grid layouts, clean typography, and minimalist UI systems.',
@@ -45,6 +47,7 @@ const seedData = async () => {
       },
       {
         username: 'elena_writes',
+        email: 'elena@example.com',
         passwordHash: commonPasswordHash,
         displayName: 'Elena Rostova',
         bio: 'Technical Writer & Content Strategist. Simplifying complex software architectures into delightful human stories.',
@@ -52,6 +55,7 @@ const seedData = async () => {
       },
       {
         username: 'marcus_dev',
+        email: 'marcus@example.com',
         passwordHash: commonPasswordHash,
         displayName: 'Marcus Vance',
         bio: 'Backend Systems Engineer. Passionate about database optimization, WebSockets, and building robust microservices.',

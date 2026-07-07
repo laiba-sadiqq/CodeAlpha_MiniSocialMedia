@@ -20,15 +20,23 @@ const generateToken = (userId) => {
 // Register
 router.post('/auth/register', async (req, res) => {
   try {
-    const { username, password, displayName } = req.body;
+    const { username, email, password, displayName } = req.body;
 
-    if (!username || !password || !displayName) {
-      return res.status(400).json({ error: 'Username, password and display name are required.' });
+    if (!username || !email || !password || !displayName) {
+      return res.status(400).json({ error: 'Username, email, password and display name are required.' });
     }
 
-    const existingUser = await User.findOne({ username: username.toLowerCase() });
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+
+    const existingUser = await User.findOne({
+      $or: [{ username: username.toLowerCase() }, { email: email.toLowerCase() }]
+    });
     if (existingUser) {
-      return res.status(400).json({ error: 'Username is already taken.' });
+      const field = existingUser.username === username.toLowerCase() ? 'Username' : 'Email';
+      return res.status(400).json({ error: `${field} is already taken.` });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -36,6 +44,7 @@ router.post('/auth/register', async (req, res) => {
 
     const newUser = new User({
       username: username.toLowerCase(),
+      email: email.toLowerCase(),
       passwordHash,
       displayName,
       avatarUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=${username}`
@@ -49,6 +58,7 @@ router.post('/auth/register', async (req, res) => {
     const userResponse = {
       _id: newUser._id,
       username: newUser.username,
+      email: newUser.email,
       displayName: newUser.displayName,
       bio: newUser.bio,
       avatarUrl: newUser.avatarUrl,
@@ -66,20 +76,24 @@ router.post('/auth/register', async (req, res) => {
 // Login
 router.post('/auth/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { identifier, username, email, password } = req.body;
+    // Accept "identifier" (preferred) or legacy "username"/"email" fields, so it can be either.
+    const loginId = (identifier || username || email || '').toLowerCase().trim();
 
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password are required.' });
+    if (!loginId || !password) {
+      return res.status(400).json({ error: 'Email/username and password are required.' });
     }
 
-    const user = await User.findOne({ username: username.toLowerCase() });
+    const user = await User.findOne({
+      $or: [{ username: loginId }, { email: loginId }]
+    });
     if (!user) {
-      return res.status(400).json({ error: 'Invalid username or password.' });
+      return res.status(400).json({ error: 'Invalid credentials.' });
     }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
-      return res.status(400).json({ error: 'Invalid username or password.' });
+      return res.status(400).json({ error: 'Invalid credentials.' });
     }
 
     const token = generateToken(user._id);
@@ -87,6 +101,7 @@ router.post('/auth/login', async (req, res) => {
     const userResponse = {
       _id: user._id,
       username: user.username,
+      email: user.email,
       displayName: user.displayName,
       bio: user.bio,
       avatarUrl: user.avatarUrl,
@@ -98,6 +113,50 @@ router.post('/auth/login', async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Server error during login.' });
+  }
+});
+
+// Check if a username is available (used for live validation during sign-up)
+router.get('/auth/check-username', async (req, res) => {
+  try {
+    const raw = (req.query.username || '').trim().toLowerCase();
+
+    if (!raw) {
+      return res.status(400).json({ error: 'Username is required.' });
+    }
+    if (!/^[a-z0-9_]+$/i.test(raw)) {
+      return res.status(400).json({ error: 'Only letters, numbers, and underscores are allowed.' });
+    }
+
+    const existing = await User.findOne({ username: raw });
+    if (!existing) {
+      return res.json({ available: true });
+    }
+
+    // Username is taken — generate a few alternative suggestions that are
+    // actually free in the database.
+    const candidateBuilders = [
+      () => `${raw}${Math.floor(Math.random() * 900 + 100)}`,      // e.g. sarah_codes482
+      () => `${raw}_${Math.floor(Math.random() * 90 + 10)}`,        // e.g. sarah_codes_57
+      () => `the_${raw}`,
+      () => `real_${raw}`,
+      () => `${raw}_official`,
+      () => `${raw}${Math.floor(Math.random() * 9000 + 1000)}`
+    ];
+
+    const suggestions = [];
+    for (const build of candidateBuilders) {
+      if (suggestions.length >= 3) break;
+      const candidate = build();
+      if (suggestions.includes(candidate)) continue;
+      const taken = await User.findOne({ username: candidate });
+      if (!taken) suggestions.push(candidate);
+    }
+
+    return res.json({ available: false, suggestions });
+  } catch (error) {
+    console.error('Check username error:', error);
+    res.status(500).json({ error: 'Server error checking username.' });
   }
 });
 
