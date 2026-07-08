@@ -18,7 +18,7 @@ export default function Feed() {
 
   const fetchFeed = async () => {
     try {
-      const res = await axios.get('/api/posts/feed');
+      const res = await axios.get('/api/posts/all');
       setPosts(res.data);
     } catch (err) {
       console.error('Error fetching feed:', err);
